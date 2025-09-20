@@ -1,0 +1,68 @@
+// datasource & generator
+generator client {
+provider = "prisma-client-js"
+}
+
+datasource db {
+provider = "postgresql"
+url = env("DATABASE_URL")
+}
+
+
+model Order {
+id String @id @default(cuid())
+orderNumber String @unique
+customerName String
+customerEmail String
+shippingAddr String
+billingAddr String
+createdAt DateTime @default(now())
+updatedAt DateTime @updatedAt
+shipment Shipment?
+items Item[]
+}
+
+model Item {
+id String @id @default(cuid())
+sku String
+name String
+quantity Int
+price Decimal @db.Decimal(10,2)
+orderId String
+order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+
+model Shipment {
+id String @id @default(cuid())
+trackingNumber String @unique
+carrier String
+serviceLevel String
+status String @default("Created")
+estimatedDate DateTime?
+orderId String @unique
+order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+events TrackingEvent[]
+createdAt DateTime @default(now())
+updatedAt DateTime @updatedAt
+}
+
+model TrackingEvent {
+id String @id @default(cuid())
+shipmentId String
+shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+status String
+location String
+description String
+eventTime DateTime @default(now())
+}
+
+
+model User {
+id String @id @default(cuid())
+email String @unique
+// store a bcrypt hash if you later add credential login
+password String
+role String @default("user")
+createdAt DateTime @default(now())
+}
