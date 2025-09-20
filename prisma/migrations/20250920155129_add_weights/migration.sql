@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Item" ADD COLUMN     "weightKg" DECIMAL(10,3) NOT NULL DEFAULT 0;
+
+-- AlterTable
+ALTER TABLE "Order" ADD COLUMN     "weightKg" DECIMAL(10,3) NOT NULL DEFAULT 0;
