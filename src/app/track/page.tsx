@@ -10,17 +10,15 @@ export default function TrackLanding() {
 
   const router = useRouter();
 
-  const isTrackingNumber = (input: string) =>
-    /^TRK-[A-Z0-9-]+$/i.test(input.trim());
-  const isAccessCode = (input: string) =>
-    /^ACC-[A-Z0-9-]{4,}$/i.test(input.trim());
+  const isTrackingNumber = (input: string) => /^TRK-[A-Z0-9-]+$/i.test(input.trim());
+  const isAccessCode = (input: string) => /^ACC-[A-Z0-9-]{4,}$/i.test(input.trim());
 
   const handleSubmit = async () => {
     const raw = q.trim();
     setError("");
 
     if (!raw) {
-      setError("Please enter a tracking number or an access code.");
+      setError("يرجى إدخال رقم تتبع أو رمز وصول.");
       return;
     }
 
@@ -28,7 +26,7 @@ export default function TrackLanding() {
     const access = isAccessCode(raw);
 
     if (!tracking && !access) {
-      setError("Invalid input. Use TRK-… for a shipment or ACC-… for history.");
+      setError("المدخل غير صحيح. استخدم TRK- للشحنة أو ACC- لسجل الطلبات.");
       return;
     }
 
@@ -41,39 +39,42 @@ export default function TrackLanding() {
       const res = await fetch(checkUrl, { method: "GET", cache: "no-store" });
 
       if (res.ok) {
-        router.push(
-          tracking
-            ? `/track/${encodeURIComponent(raw)}`
-            : `/history/${encodeURIComponent(raw)}`
-        );
+        router.push(tracking ? `/track/${encodeURIComponent(raw)}` : `/history/${encodeURIComponent(raw)}`);
         return;
       }
 
       let msg = tracking
-        ? "Tracking number not found. Please check and try again."
-        : "Access code is incorrect or expired. Please check and try again.";
+        ? "لم يتم العثور على رقم التتبع. يرجى التحقق والمحاولة مرة أخرى."
+        : "رمز الوصول غير صحيح أو منتهي. يرجى التحقق والمحاولة مرة أخرى.";
 
       try {
         const data = await res.json();
         if (data?.error) msg = data.error;
-      } catch {}
+      } catch {
+        // تجاهل خطأ قراءة JSON
+      }
 
       setError(msg);
     } catch {
-      setError("Something went wrong while searching. Please try again.");
+      setError("حدث خطأ أثناء البحث. يرجى المحاولة مرة أخرى.");
     } finally {
       setLoading(false);
     }
   };
 
+  const onFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!loading) handleSubmit();
+  };
+
   return (
-    <div className="flex items-center justify-center">
+    <div className="flex items-center justify-center" dir="rtl">
       <div className="bg-white shadow-md rounded-xl w-full max-w-xl px-4 py-6 md:p-8 text-center">
-        {/* Persona image */}
+        {/* صورة تعريفية */}
         <div className="flex justify-center mb-4">
           <Image
             src="/shipping-persona.png"
-            alt="Shipping persona"
+            alt="شخصية الشحن"
             width={80}
             height={80}
             className="rounded-full"
@@ -82,60 +83,77 @@ export default function TrackLanding() {
         </div>
 
         <h2 className="text-base md:text-lg font-semibold mb-2">
-          Find Your Shipment
+          تتبّع شحنتك أو اعرض سجل الطلبات
         </h2>
 
-        <div className="flex w-full sm:w-auto justify-center">
-          {/* Input with left-rounded corners only */}
-          <input
-            className="flex-1 border border-gray-300 rounded-l-lg px-3 py-2 md:px-4 md:py-2 text-sm md:text-base focus:outline-none focus:ring-2"
-            placeholder="e.g. TRK- or ACC-"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) =>
-              e.key === "Enter" && !loading && handleSubmit()
-            }
-            disabled={loading}
-            aria-invalid={!!error}
-            aria-describedby={error ? "search-error" : undefined}
-          />
-
-          {/* Button with right-rounded corners only */}
-          <button
+        {/* شريط البحث: غلاف موحد يمنع كسر الحواف ويضمن تساوي الارتفاع */}
+        <form onSubmit={onFormSubmit} className="mx-auto w-full sm:w-auto">
+          <div
             className="
-              flex items-center justify-center
-              bg-green-700 text-white shadow-sm
-              hover:bg-green-800 transition
-              disabled:opacity-60 disabled:cursor-not-allowed
-              h-10 w-10 sm:h-auto sm:w-auto
-              sm:px-4 sm:py-2
-              rounded-r-lg
+              inline-flex w-full sm:w-[28rem]
+              items-stretch
+              rounded-lg border border-gray-300 bg-white
+              overflow-hidden shadow-sm
+              focus-within:ring-2 focus-within:ring-green-700
             "
-            onClick={handleSubmit}
-            disabled={loading}
-            aria-label="Search"
+            role="search"
           >
-            {loading ? (
-              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-            ) : (
-              // Search icon
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={2}
-                stroke="currentColor"
-                className="h-5 w-5"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 103.5 10.5a7.5 7.5 0 0013.15 6.15z"
-                />
-              </svg>
-            )}
-          </button>
-        </div>
+            <input
+              className="
+                w-full
+                px-3 md:px-4
+                py-2
+                text-sm md:text-base
+                text-right
+                outline-none border-0 bg-transparent
+                placeholder:text-gray-400
+              "
+              placeholder="مثال: -TRK أو -ACC"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              disabled={loading}
+              aria-invalid={!!error}
+              aria-describedby={error ? "search-error" : undefined}
+            />
+
+            <button
+              type="submit"
+              className="
+                shrink-0
+                px-3 md:px-4
+                min-h-[40px]
+                bg-green-700 text-white
+                hover:bg-green-800 transition
+                disabled:opacity-60 disabled:cursor-not-allowed
+                flex items-center justify-center
+              "
+              aria-label="بحث"
+              title="بحث"
+              disabled={loading}
+            >
+              {loading ? (
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              ) : (
+                // أيقونة البحث
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                  className="h-5 w-5"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 103.5 10.5a7.5 7.5 0 0013.15 6.15z"
+                  />
+                </svg>
+              )}
+            </button>
+          </div>
+        </form>
 
         {error && (
           <div
@@ -149,8 +167,8 @@ export default function TrackLanding() {
         )}
 
         <p className="text-[11px] md:text-xs text-gray-500 mt-3">
-          • Tracking number → single shipment <br />
-          • Access code → full orders history
+          • رقم التتبع ← شحنة واحدة <br />
+          • رمز الوصول ← كل الطلبات السابقة
         </p>
       </div>
     </div>
