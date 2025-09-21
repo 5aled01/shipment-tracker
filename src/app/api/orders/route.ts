@@ -1,29 +1,29 @@
+// src/app/api/orders/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 
+// Item without SKU; dual prices
 const ItemSchema = z.object({
-  sku: z.string(),
   name: z.string(),
   quantity: z.number().int().positive(),
-  price: z.number().nonnegative(),
-  // NEW: per-unit weight in kilograms
+  priceAED: z.number().nonnegative(),
+  priceMRU: z.number().nonnegative(),
   weightKg: z.number().nonnegative().default(0),
 });
 
+// Order payload: name/phone/from/to only (no email/addresses)
 const CreateOrderSchema = z.object({
   orderNumber: z.string(),
   customerName: z.string(),
-  customerEmail: z.string().email(),
-  shippingAddr: z.string(),
-  billingAddr: z.string(),
-  carrier: z.string(),
-  serviceLevel: z.string(),
-  estimatedDate: z.string().optional(),
+  customerPhone: z.string(),
+  fromCountry: z.string(),
+  toCountry: z.string(),
   trackingNumber: z.string(),
+  serviceLevel: z.string().default("Standard"),
+  status: z.string().default("Created"),
+  estimatedDate: z.string().optional(),
   items: z.array(ItemSchema).min(1),
-  // Optional: allow caller to provide a pre-computed total (we’ll recompute anyway)
-  weightKg: z.number().nonnegative().optional(),
 });
 
 function requireApiKey(headers: Headers) {
@@ -51,49 +51,46 @@ export async function POST(req: Request) {
   }
 
   const {
-    orderNumber, customerName, customerEmail, shippingAddr, billingAddr,
-    carrier, serviceLevel, estimatedDate, trackingNumber, items, weightKg,
+    orderNumber,
+    customerName,
+    customerPhone,
+    fromCountry,
+    toCountry,
+    trackingNumber,
+    serviceLevel,
+    status,
+    estimatedDate,
+    items,
   } = parsed.data;
-
-  // Compute total order weight from items
-  const computedWeight = items.reduce(
-    (sum, it) => sum + (it.weightKg ?? 0) * it.quantity,
-    0
-  );
 
   const order = await prisma.order.create({
     data: {
-      orderNumber, customerName, customerEmail, shippingAddr, billingAddr,
-      // store computed total (or provided if greater truth prevails)
-      weightKg: typeof weightKg === "number" ? weightKg : computedWeight,
+      orderNumber,
+      customerName,
+      customerPhone,
+      fromCountry,
+      toCountry,
       items: {
         create: items.map((i) => ({
-          sku: i.sku,
           name: i.name,
           quantity: i.quantity,
-          price: i.price,
+          priceAED: i.priceAED,
+          priceMRU: i.priceMRU,
           weightKg: i.weightKg ?? 0,
         })),
       },
       shipment: {
         create: {
-          trackingNumber, carrier, serviceLevel,
-          status: "Created",
+          trackingNumber,
+          carrier: "hidden", // kept in DB, not shown in UI
+          serviceLevel,
+          status,
           estimatedDate: estimatedDate ? new Date(estimatedDate) : null,
         },
       },
     },
-    include: { shipment: true, items: true },
+    include: { items: true, shipment: true },
   });
-
-  // If provided weight was missing or wrong, ensure DB has the computed total
-  const ensuredTotal = order.items.reduce(
-    (sum, it) => sum + Number(it.weightKg) * it.quantity,
-    0
-  );
-  if (Number(order.weightKg) !== ensuredTotal) {
-    await prisma.order.update({ where: { id: order.id }, data: { weightKg: ensuredTotal } });
-  }
 
   return NextResponse.json(order, { status: 201 });
 }

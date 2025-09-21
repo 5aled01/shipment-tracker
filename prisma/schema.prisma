@@ -1,4 +1,4 @@
-// datasource & generator
+// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,79 +8,80 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Customer {
+  id         String  @id @default(cuid())
+  // email    String  @unique   // ❌ removed
+  phoneE164  String
+  accessCode String  @unique
+
+  orders     Order[]
+}
+
 model Order {
-  id             String   @id @default(cuid())
-  orderNumber    String   @unique
-  customerName   String
-  customerEmail  String
-  shippingAddr   String
-  billingAddr    String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            String   @id @default(cuid())
+  orderNumber   String   @unique
 
-  // NEW: total order weight in kilograms
-  weightKg       Decimal  @db.Decimal(10,3) @default(0)
+  // Client identity (no email)
+  customerName  String
+  customerPhone String      @default("")
 
-  // (existing) relations
-  customerId     String?
-  customer       Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  shipment       Shipment?
-  items          Item[]
+  // Route instead of addresses
+  fromCountry   String      @default("Unknown")
+  toCountry     String      @default("Unknown")
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Optional total weight
+  weightKg      Decimal  @db.Decimal(10,3) @default(0)
+
+  customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  shipment      Shipment?
+  items         Item[]
 }
 
 model Item {
   id        String  @id @default(cuid())
-  sku       String
+  // sku     String              // ❌ removed
   name      String
   quantity  Int
-  price     Decimal @db.Decimal(10,2)
 
-  // NEW: per-unit weight in kilograms
+  // Dual currency prices
+  priceAED  Decimal @db.Decimal(10,2) @default(0)
+  priceMRU  Decimal @db.Decimal(10,2) @default(0)
+
+  // Optional per-unit weight
   weightKg  Decimal @db.Decimal(10,3) @default(0)
 
   orderId   String
   order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
 }
 
-
 model Shipment {
-  id             String          @id @default(cuid())
-  trackingNumber String          @unique
-  carrier        String
-  serviceLevel   String
-  status         String          @default("Created")
-  estimatedDate  DateTime?
-  orderId        String          @unique
-  order          Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  events         TrackingEvent[]
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  id              String   @id @default(cuid())
+  trackingNumber  String   @unique
+  carrier         String
+  serviceLevel    String
+  status          String   @default("Created")
+  estimatedDate   DateTime?
+
+  orderId         String   @unique
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  events          TrackingEvent[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model TrackingEvent {
   id          String   @id @default(cuid())
-  shipmentId  String
-  shipment    Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
   status      String
   location    String
-  description String
+  description String?
   eventTime   DateTime @default(now())
-}
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  role      String   @default("user")
-  createdAt DateTime @default(now())
-}
-
-// NEW: Customer with private accessCode to view history
-model Customer {
-  id         String   @id @default(cuid())
-  email      String   @unique
-  phoneE164  String?  @unique
-  accessCode String   @unique // e.g., "ACC-7H92Q3KD" (treat like a password)
-  createdAt  DateTime @default(now())
-  orders     Order[]
+  shipmentId  String
+  shipment    Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
 }
