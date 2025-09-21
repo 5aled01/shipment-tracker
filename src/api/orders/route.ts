@@ -19,10 +19,12 @@ const CreateOrderSchema = z.object({
   fromCountry: z.string().min(1, "fromCountry is required"),
   toCountry: z.string().min(1, "toCountry is required"),
 
-  // Shipment fields
-  serviceLevel: z.enum(["Standard", "Express"]).or(z.string().min(1)), // allow custom strings if needed
+  // Shipment fields (carrier required)
+  carrier: z.string().min(1, "carrier is required"),
+  serviceLevel: z.enum(["Standard", "Express"]).or(z.string().min(1)),
   trackingNumber: z.string().min(1, "trackingNumber is required"),
-  estimatedDate: z.string().datetime().optional(), // ISO string preferred
+  // Accept ISO datetime or plain date; convert later
+  estimatedDate: z.string().optional(),
 
   // Items
   items: z.array(ItemSchema).min(1, "At least one item is required"),
@@ -66,13 +68,16 @@ export async function POST(req: Request) {
     customerPhone,
     fromCountry,
     toCountry,
+    carrier,
     serviceLevel,
-    estimatedDate,
     trackingNumber,
+    estimatedDate,
     items,
   } = parsed.data;
 
-  // Create
+  // Normalize date if provided (supports "YYYY-MM-DD" or ISO)
+  const estDate = estimatedDate ? new Date(estimatedDate) : null;
+
   try {
     const order = await prisma.order.create({
       data: {
@@ -93,9 +98,10 @@ export async function POST(req: Request) {
         shipment: {
           create: {
             trackingNumber,
+            carrier,        // ✅ required by your schema
             serviceLevel,
             status: "Created",
-            estimatedDate: estimatedDate ? new Date(estimatedDate) : null,
+            estimatedDate: estDate,
           },
         },
       },
